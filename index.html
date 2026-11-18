@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team 8 토큰부족 · Visual Task</title>
+<meta name="description" content="2026 AICOSS 산학협력 실습중심 딥러닝 여름부트캠프 경진대회 8팀 토큰부족의 상권분석 VQA와 Reasoning Segmentation 개발 기록">
+<meta property="og:title" content="Team 8 토큰부족 · Visual Task 개발과정">
+<meta property="og:description" content="Qwen3-VL 중심으로 상권분석 VQA(정확도 0.780)와 Reasoning Segmentation(Dice 0.513)을 풀어낸 과정">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f1f0ec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --accent-soft: rgba(42, 120, 214, 0.09);
+  --good: #006300;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.04), 0 8px 24px rgba(11, 11, 11, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-ink: #86b6ef;
+    --accent-soft: rgba(57, 135, 229, 0.14);
+    --good: #0ca30c;
+    --shadow: none;
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: "Pretendard", system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent-ink); text-underline-offset: 3px; }
+img { max-width: 100%; display: block; }
+code { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 0.88em; background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 6px; }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } }
+
+/* nav */
+.nav {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--page) 86%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 56px; }
+.brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; white-space: nowrap; }
+.brand span { color: var(--muted); font-weight: 500; }
+.nav-links { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a { color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 500; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+.nav-links a:hover { background: var(--surface-2); color: var(--ink); }
+@media (max-width: 520px) { .brand span { display: none; } }
+
+/* hero */
+.hero { padding: 72px 0 56px; }
+.eyebrow { font-size: 14px; font-weight: 600; color: var(--accent-ink); letter-spacing: 0.01em; margin: 0 0 14px; }
+h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.15; letter-spacing: -0.035em; margin: 0 0 18px; font-weight: 800; }
+.lede { font-size: clamp(17px, 2.1vw, 19px); color: var(--ink-2); max-width: 720px; margin: 0 0 36px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 760px; }
+@media (max-width: 600px) { .stats { grid-template-columns: 1fr; } }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; box-shadow: var(--shadow); }
+.stat-label { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.stat-value { font-size: 48px; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; margin: 6px 0 4px; }
+.stat-sub { font-size: 13px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; border: 1px solid var(--border); color: var(--ink); background: var(--surface); }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.06); background: var(--accent); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* sections */
+section.block { padding: 72px 0; border-top: 1px solid var(--border); }
+.section-head { margin-bottom: 36px; }
+.kicker { display: inline-block; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; margin-bottom: 14px; }
+h2 { font-size: clamp(28px, 4vw, 38px); line-height: 1.25; letter-spacing: -0.03em; margin: 0 0 12px; font-weight: 800; }
+h3 { font-size: 21px; letter-spacing: -0.02em; margin: 56px 0 8px; line-height: 1.35; }
+h3 + .sub-lede { margin-top: 0; }
+.sub-lede { color: var(--ink-2); margin: 0 0 22px; max-width: 760px; }
+.section-head p { color: var(--ink-2); max-width: 760px; margin: 0; font-size: 17px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+
+/* facts row */
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .facts { grid-template-columns: 1fr; } }
+.fact .fact-k { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.fact .fact-v { font-size: 18px; font-weight: 700; margin-top: 4px; letter-spacing: -0.01em; }
+.fact .fact-d { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.chips li { font-size: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; color: var(--ink-2); }
+.chips b { color: var(--ink); margin-right: 4px; }
+
+/* evolution steps (task 1) */
+.evo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; counter-reset: evo; }
+@media (max-width: 860px) { .evo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .evo { grid-template-columns: 1fr; } }
+.evo li { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; position: relative; }
+.evo .n { font-size: 13px; font-weight: 700; color: var(--muted); }
+.evo .t { font-weight: 700; font-size: 17px; margin: 2px 0 2px; letter-spacing: -0.01em; }
+.evo .m { display: inline-block; font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--surface-2); border-radius: 6px; padding: 1px 8px; margin-bottom: 8px; }
+.evo .d { font-size: 14px; color: var(--ink-2); margin: 0; }
+.evo li.final { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.evo li.final .m { background: var(--accent); color: #fff; }
+
+.compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+@media (max-width: 700px) { .compare { grid-template-columns: 1fr; } }
+.compare h4 { margin: 0 0 10px; font-size: 16px; }
+.compare .tag { font-size: 12px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 2px; letter-spacing: 0.03em; }
+.compare ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 15px; }
+.compare li + li { margin-top: 4px; }
+.compare .card.win { border-color: var(--accent); }
+.quote { margin: 18px 0 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.quote span { color: var(--muted); font-weight: 500; font-size: 15px; display: block; }
+
+/* 3 steps */
+.steps3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; counter-reset: s3; }
+@media (max-width: 760px) { .steps3 { grid-template-columns: 1fr; } }
+.steps3 .card { position: relative; }
+.steps3 .num { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; font-size: 14px; display: grid; place-items: center; margin-bottom: 10px; }
+.steps3 h4 { margin: 0 0 4px; font-size: 17px; }
+.steps3 p { margin: 0; color: var(--ink-2); font-size: 15px; }
+
+/* decision tree */
+.tree { display: grid; gap: 14px; }
+.tree .root { text-align: center; }
+.tree .root .lbl { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.tree .root .eq { font-weight: 700; font-size: 17px; margin-top: 2px; }
+.tree .root .eq small { display: block; font-weight: 500; font-size: 14px; color: var(--ink-2); }
+.branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; position: relative; }
+@media (max-width: 760px) { .branches { grid-template-columns: 1fr; } }
+.branch { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.cond { display: inline-block; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.branch p { margin: 0; font-size: 15px; color: var(--ink-2); }
+.branch p b { color: var(--ink); }
+.branch .split { margin-top: 10px; display: grid; gap: 6px; }
+.branch .split div { font-size: 14px; border-left: 2px solid var(--accent); padding: 2px 0 2px 10px; color: var(--ink-2); }
+
+/* pipeline (task 2) */
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; list-style: none; padding: 0; margin: 0; }
+.pipe li { position: relative; padding: 0 10px; }
+.pipe li:first-child { padding-left: 0; }
+.pipe li:last-child { padding-right: 0; }
+.pipe .box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; height: 100%; }
+.pipe li:not(:last-child)::after {
+  content: ""; position: absolute; right: -6px; top: 34px; width: 12px; height: 12px;
+  border-top: 2px solid var(--axis); border-right: 2px solid var(--axis); transform: rotate(45deg);
+}
+.pipe .step { font-size: 12px; font-weight: 700; color: var(--accent-ink); }
+.pipe .ttl { font-weight: 700; font-size: 16px; margin: 2px 0 6px; letter-spacing: -0.01em; }
+.pipe .who { display: inline-block; font-size: 12px; font-weight: 700; background: var(--surface-2); border-radius: 6px; padding: 1px 8px; margin-bottom: 8px; color: var(--ink-2); }
+.pipe p { margin: 0; font-size: 14px; color: var(--ink-2); }
+@media (max-width: 900px) {
+  .pipe { grid-template-columns: 1fr; gap: 18px; }
+  .pipe li { padding: 0; }
+  .pipe li:not(:last-child)::after { right: auto; left: 50%; top: auto; bottom: -15px; transform: translateX(-50%) rotate(135deg); }
+}
+.note { font-size: 14px; color: var(--ink-2); background: var(--surface-2); border-radius: 12px; padding: 12px 16px; margin-top: 16px; }
+.note b { color: var(--ink); }
+
+/* chart */
+.chart-card { padding: 22px 22px 8px; }
+.chart-title { font-weight: 700; font-size: 16px; margin: 0; }
+.chart-sub { font-size: 14px; color: var(--muted); margin: 2px 0 8px; }
+.chart { position: relative; width: 100%; height: 260px; }
+.chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .baseline { stroke: var(--axis); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.chart .dot.on { r: 7; }
+.chart .hit { fill: transparent; cursor: default; outline: none; }
+.chart .hit:focus-visible + .dot, .chart .hit:hover + .dot { r: 7; }
+.chart .vlabel { fill: var(--ink); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .guide { stroke: var(--axis); stroke-width: 1; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12); max-width: 240px; opacity: 0; transform: translateY(4px);
+  transition: opacity .12s, transform .12s;
+}
+.tip.show { opacity: 1; transform: none; }
+.tip b { font-variant-numeric: tabular-nums; }
+.tip .delta { color: var(--good); font-weight: 700; }
+.tip .muted { color: var(--muted); }
+
+.timeline { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 44px 84px 1fr; gap: 12px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--border); }
+.timeline li:first-child { border-top: 0; }
+.timeline .i { font-size: 13px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timeline .v { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.timeline .w b { display: block; font-size: 16px; }
+.timeline .w span { font-size: 14px; color: var(--ink-2); }
+.timeline .day { display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 0 6px; margin-left: 6px; vertical-align: 2px; }
+@media (max-width: 520px) { .timeline li { grid-template-columns: 32px 64px 1fr; gap: 8px; } }
+
+/* table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 460px; }
+th, td { padding: 11px 16px; text-align: left; border-top: 1px solid var(--border); }
+thead th { border-top: 0; font-size: 13px; color: var(--muted); font-weight: 700; background: var(--surface-2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.best { font-weight: 800; color: var(--ink); }
+td.best::after { content: " ●"; color: var(--accent); font-size: 10px; vertical-align: 2px; }
+tr.group td { font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-2); padding: 6px 16px; letter-spacing: .03em; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+.two .card h4 { margin: 0 0 6px; font-size: 17px; }
+.two .card p, .two .card li { color: var(--ink-2); font-size: 15px; }
+.two .card ul { margin: 6px 0 0; padding-left: 18px; }
+.two .card p { margin: 0; }
+.verdict { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 8px; margin-bottom: 8px; background: var(--surface-2); color: var(--ink-2); }
+
+/* router */
+.router { list-style: none; margin: 0; padding: 0; }
+.router li { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(140px, 38%); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--border); }
+.router li:first-child { border-top: 0; }
+.badge { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-weight: 800; font-size: 15px; background: var(--accent-soft); color: var(--accent-ink); }
+.router .name { font-weight: 700; font-size: 16px; }
+.router .name span { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: 4px; }
+.router .desc { font-size: 14px; color: var(--ink-2); }
+.bar { display: flex; align-items: center; gap: 8px; outline: none; }
+.bar .fill { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+.bar .val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar .val small { color: var(--muted); font-weight: 500; }
+@media (max-width: 600px) {
+  .router li { grid-template-columns: 36px minmax(0, 1fr); row-gap: 8px; }
+  .router .bar { grid-column: 2; }
+}
+
+/* gallery */
+.gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .gallery { grid-template-columns: 1fr; } }
+.ex { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.ex .media { position: relative; aspect-ratio: 1 / 1; background: var(--surface-2); }
+.ex .media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .2s; }
+.ex .media img.orig { opacity: 0; }
+.ex.show-orig .media img.orig { opacity: 1; }
+.ex.show-orig .media img.mask { opacity: 0; }
+.ex .toggle {
+  position: absolute; right: 10px; bottom: 10px; font: inherit; font-size: 13px; font-weight: 600;
+  background: rgba(11,11,11,0.72); color: #fff; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer;
+}
+.ex .toggle:hover { background: rgba(11,11,11,0.85); }
+.ex .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.ex .type { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.ex .type .badge { width: 24px; height: 24px; font-size: 12px; border-radius: 7px; }
+.ex blockquote { margin: 0; font-size: 14px; line-height: 1.55; color: var(--ink); font-style: italic; word-break: normal; overflow-wrap: break-word; }
+.ex .ans { font-size: 14px; color: var(--ink-2); margin: 0; padding-top: 8px; border-top: 1px dashed var(--border); margin-top: auto; }
+.ex .ans b { color: var(--ink); }
+.legend-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 14px; color: var(--ink-2); margin: -8px 0 18px; }
+.legend-row i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; background: rgb(0, 190, 255); vertical-align: -2px; margin-right: 6px; box-shadow: 0 0 0 2px #fff inset; }
+
+/* files */
+.files { list-style: none; margin: 0; padding: 0; }
+.files li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--border); }
+.files li:first-child { border-top: 0; }
+.files .p { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; font-size: 14px; font-weight: 600; word-break: break-all; }
+.files .d { font-size: 14px; color: var(--ink-2); }
+.files a.go { font-size: 14px; font-weight: 600; white-space: nowrap; }
+
+footer { border-top: 1px solid var(--border); padding: 36px 0 56px; color: var(--muted); font-size: 14px; }
+footer b { color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">Team 8 <span>· 토큰부족</span></a>
+    <nav class="nav-links" aria-label="섹션">
+      <a href="#task1">Task 1</a>
+      <a href="#task2">Task 2</a>
+      <a href="#examples">결과 예시</a>
+      <a href="#files">파일</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <p class="eyebrow">2026 AICOSS 산학협력 실습중심 딥러닝 여름부트캠프 &amp; 경진대회</p>
+      <h1>Visual Task 개발과정</h1>
+      <p class="lede">상권 이미지 업종 분류(VQA)와 Reasoning Segmentation 두 과제를 추가 학습 없이 풀었습니다. Qwen3-VL-8B를 중심에 두고 모델을 늘리기보다 추론 절차와 프롬프트를 다듬는 데 집중했습니다.</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Task 1 · 상권분석 VQA</div>
+          <div class="stat-value">0.780</div>
+          <div class="stat-sub">Accuracy · 최종 리더보드</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Task 2 · Reasoning Segmentation</div>
+          <div class="stat-value">0.513</div>
+          <div class="stat-sub">Dice · Kaggle 최종 제출</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn primary" href="slides/team8_발표.pptx" download>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          발표자료 받기 (.pptx)
+        </a>
+        <a class="btn" data-repo-path="" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+          GitHub 저장소
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TASK 1 ===================== -->
+  <section class="block" id="task1">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Task 1</span>
+        <h2>상권분석 VQA</h2>
+        <p>매장 이미지 한 장을 보고 8개 업종 중 주된 업종 하나를 고르는 문제입니다. 음식 하나만 보고 판단하면 틀리기 쉬워서, 무엇을 주로 팔고 손님이 어떻게 이용하는지를 함께 봐야 합니다.</p>
+        <ul class="chips" aria-label="선택지">
+          <li><b>A</b>한식</li><li><b>B</b>양식</li><li><b>C</b>일식</li><li><b>D</b>중식</li>
+          <li><b>E</b>카페</li><li><b>F</b>베이커리</li><li><b>G</b>주점</li><li><b>H</b>동남아</li>
+        </ul>
+      </div>
+
+      <div class="facts">
+        <div class="card fact"><div class="fact-k">Model</div><div class="fact-v">Qwen3-VL-8B-Instruct</div><div class="fact-d">추가 학습 없이 추론만, 단일 VLM 중심</div></div>
+        <div class="card fact"><div class="fact-k">Method</div><div class="fact-v">8-way TTA + 계층 판단</div><div class="fact-d">구조화 프롬프트 · 선택지 8회 순환 · margin 0.15</div></div>
+        <div class="card fact"><div class="fact-k">Accuracy</div><div class="fact-v">0.780</div><div class="fact-d">최종 리더보드 제출 정확도</div></div>
+      </div>
+
+      <h3>복잡한 앙상블에서 단순한 구조로</h3>
+      <p class="sub-lede">여러 모델을 섞어 보다가 Qwen 하나로 되돌아왔고, 그다음 선택지 위치 편향과 업종 간 혼동을 차례로 보완했습니다.</p>
+      <ol class="evo">
+        <li><div class="n">01</div><div class="t">Visual-CoT 탐색</div><span class="m">QWEN</span><p class="d">bbox를 예측해 crop한 뒤, 원본과 ROI를 함께 다시 질의</p></li>
+        <li><div class="n">02</div><div class="t">Multi-view + CLIP</div><span class="m">QWEN + CLIP</span><p class="d">전체·상단·하단 시점으로 나눠 보고 CLIP으로 보조 투표</p></li>
+        <li><div class="n">03</div><div class="t">Visual-CoT Clean</div><span class="m">QWEN + CLIP</span><p class="d">핵심 ROI만 다시 분류, CLIP 비교는 유지</p></li>
+        <li><div class="n">04</div><div class="t">Qwen 중심 전환</div><span class="m">QWEN ONLY</span><p class="d">실제 제출 비교에서 Qwen 단독이 우세, margin이 낮은 경우만 재검토</p></li>
+        <li><div class="n">05</div><div class="t">8-way Option TTA</div><span class="m">QWEN × 8</span><p class="d">선택지 문자 위치를 순환시키고 역매핑해서 평균</p></li>
+        <li class="final"><div class="n">06</div><div class="t">TTA + Hierarchy</div><span class="m">FINAL · 0.78</span><p class="d">구조화 프롬프트와 업종 계층 확률 보정</p></li>
+      </ol>
+
+      <div class="compare">
+        <div class="card">
+          <h4><span class="tag">초기</span>복잡한 Qwen + CLIP 앙상블</h4>
+          <ul>
+            <li>전체·상단·하단 multi-view</li>
+            <li>CLIP을 보조 판별기로 추가</li>
+            <li>Visual-CoT ROI까지 확장</li>
+            <li>저장해 둔 예시 5개에서 CLIP 판단이 4번 상충</li>
+            <li>추론 분기와 규칙이 점점 복잡해짐</li>
+          </ul>
+        </div>
+        <div class="card win">
+          <h4><span class="tag">최종</span>단순한 Qwen 중심 구조</h4>
+          <ul>
+            <li>최종 판단은 원래도 주로 Qwen 쪽이 이끌었음</li>
+            <li>실제 제출 비교에서 Qwen 단독이 우세</li>
+            <li>CLIP을 빼서 파이프라인 단순화</li>
+            <li>생성된 문자 대신 A~H 토큰 점수를 사용</li>
+            <li>남은 연산을 TTA와 계층 판단에 집중</li>
+          </ul>
+        </div>
+      </div>
+      <p class="quote">“Simple Qwen based structure is better than complex ensemble!”<span>모델을 늘리기보다 절차를 정교하게</span></p>
+
+      <h3>8-way 선택지 순환 TTA</h3>
+      <p class="sub-lede">VLM은 선택지의 내용과 상관없이 특정 위치의 문자를 더 자주 고르는 경향이 있습니다. 같은 이미지·같은 모델로 업종과 A~H의 매핑만 8번 돌려서 이 편향을 평균으로 지웠습니다.</p>
+      <div class="steps3">
+        <div class="card"><div class="num">1</div><h4>선택지 순환</h4><p>업종 ↔ A~H 매핑만 8번 회전시켜 8번 추론</p></div>
+        <div class="card"><div class="num">2</div><h4>업종 기준 역매핑</h4><p>문자별 점수를 원래의 한식·양식… 순서로 되돌림</p></div>
+        <div class="card"><div class="num">3</div><h4>확률 평균</h4><p>8번의 상대 점수를 산술평균하고, 1위를 base 라벨로 지정</p></div>
+      </div>
+
+      <h3>확률 차이가 충분할 때만 계층적으로 보정</h3>
+      <p class="sub-lede">카페·베이커리·주점처럼 서로 헷갈리는 업종이 많아서, 먼저 큰 갈래를 정하고 그 안에서 고르게 했습니다. 갈래 간 확률 차이가 0.15보다 작으면 섣불리 바꾸지 않습니다.</p>
+      <div class="tree">
+        <div class="card root">
+          <div class="lbl">STAGE 1 · 8회 평균 확률</div>
+          <div class="eq">R = A+B+C+D+H &nbsp;vs&nbsp; S = E+F+G<small>음식점(한·양·일·중·동남아) vs 카페·베이커리·주점</small></div>
+        </div>
+        <div class="branches">
+          <div class="branch">
+            <span class="cond">|R − S| &lt; 0.15</span>
+            <p><b>base 라벨 유지</b><br>차이가 작으면 TTA 결과를 그대로 사용</p>
+          </div>
+          <div class="branch">
+            <span class="cond">R &gt; S · 음식점</span>
+            <p><b>As = A+C+D+H</b> (아시아) vs <b>W = B</b> (서양)</p>
+            <div class="split">
+              <div>As 우세 → A·C·D·H 중 최대</div>
+              <div>W 우세 → B 양식</div>
+            </div>
+          </div>
+          <div class="branch">
+            <span class="cond">S &gt; R · 카페류</span>
+            <p><b>E·F·G 중 최대</b><br>카페, 베이커리, 주점 중에서 선택</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>프롬프트: 나열에서 규칙으로</h3>
+      <div class="two">
+        <div class="card">
+          <span class="verdict">초기</span>
+          <h4>모델과 시점 위주</h4>
+          <ul>
+            <li>모델·crop·multi-view 실험이 먼저, 프롬프트 분석은 뒤로 밀림</li>
+            <li>선택지 설명은 단순 나열</li>
+            <li>작은 물체 하나에 판단이 흔들림</li>
+            <li>카페·베이커리·주점 혼동이 반복됨</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="verdict">최종</span>
+          <h4>고민한 내용을 규칙으로</h4>
+          <ul>
+            <li>먼저 주된 영업 형태를 판단</li>
+            <li>음식점이면 서양 / 아시아로 나누고, 아시아면 한·일·중·동남아로 나눔</li>
+            <li>단서 하나로 결정하지 않고 근거 2가지를 교차 확인</li>
+            <li>근거가 충돌하면 주된 판매·이용 형태를 우선</li>
+          </ul>
+        </div>
+      </div>
+      <p class="note">Task 1 코드는 아직 이 저장소에 포함되어 있지 않습니다.</p>
+    </div>
+  </section>
+
+  <!-- ===================== TASK 2 ===================== -->
+  <section class="block" id="task2">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Task 2</span>
+        <h2>Reasoning Segmentation</h2>
+        <p>이미지와 함께 “차가 갑자기 멈춰야 할 때 뒤차에 경고하려면 어떤 버튼을 누를까?” 같은 간접적인 질문이 주어집니다. 질문이 가리키는 대상을 추론으로 찾아 픽셀 단위 마스크로 분할하는 문제로, 평가는 Dice, 테스트 이미지는 200장입니다.</p>
+      </div>
+
+      <ol class="pipe" aria-label="최종 파이프라인">
+        <li><div class="box"><div class="step">STEP 1</div><div class="ttl">입력</div><span class="who">IMAGE + QUERY</span><p>1000×1000 이미지와 영어로 된 질문</p></div></li>
+        <li><div class="box"><div class="step">STEP 2</div><div class="ttl">쿼리 유형 분류</div><span class="who">Qwen3-VL</span><p>필요한 추론 방식에 따라 A~F 중 하나로 분류</p></div></li>
+        <li><div class="box"><div class="step">STEP 3</div><div class="ttl">유형별 프롬프트로 대상 찾기</div><span class="who">Qwen3-VL</span><p>대상마다 bbox와 point를 JSON으로 출력, 여러 개면 모두</p></div></li>
+        <li><div class="box"><div class="step">STEP 4</div><div class="ttl">마스크 생성</div><span class="who">SAM 2.1</span><p>bbox를 1.03배 넓히고 point와 함께 프롬프트로 사용</p></div></li>
+        <li><div class="box"><div class="step">STEP 5</div><div class="ttl">합치고 인코딩</div><span class="who">RLE → CSV</span><p>대상별 마스크를 합쳐 RLE로 변환해 제출</p></div></li>
+      </ol>
+      <p class="note"><b>Fail-safe.</b> 유형 분류나 JSON 파싱이 실패하면 범용 프롬프트로 돌아가서 루프가 멈추지 않게 했습니다. 유형 분포와 fallback 비율은 200개를 돌 때마다 기록해 디버깅 근거로 썼습니다. 직전 버전 실행 로그 기준으로 200개 중 199개가 정상 처리됐고, 1개는 fallback으로 처리됐습니다.</p>
+
+      <h3>점수 변화: 0.4724 → 0.513</h3>
+      <p class="sub-lede">이틀 동안 여섯 번 개선했습니다. 첫날은 모델 조합과 bbox 크기를 정했고, 둘째 날은 프롬프트와 출력 규칙을 다듬었습니다.</p>
+      <div class="card chart-card">
+        <p class="chart-title">Kaggle 점수 (Dice)</p>
+        <p class="chart-sub">개선 단계별 제출 점수 · 점에 마우스를 올리면 단계별 내용이 보입니다</p>
+        <div class="chart" id="scoreChart" role="img" aria-label="Kaggle 점수가 0.4724에서 0.513까지 여섯 단계에 걸쳐 오른 선 그래프. 단계별 값은 아래 목록에 있습니다."></div>
+        <ol class="timeline" id="scoreList"></ol>
+      </div>
+
+      <h3>첫날: 기반 고르기</h3>
+      <p class="sub-lede">Qwen2.5-VL과 Qwen3-VL, SAM 2.1과 SAM 3을 비교해서 <b>Qwen3-VL + SAM 2.1</b>로 고정했습니다. Qwen2.5-VL이 더 빠르고 메모리도 덜 썼지만, Qwen3-VL은 잘못된 bbox가 한 번도 나오지 않을 만큼 안정적이었습니다.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목 (200장 전체)</th><th class="num">Qwen2.5-VL 7B</th><th class="num">Qwen3-VL 8B</th></tr></thead>
+          <tbody>
+            <tr class="group"><td colspan="3">정확성 · 안정성</td></tr>
+            <tr><td>Full Success</td><td class="num">178 (89.0%)</td><td class="num best">183 (91.5%)</td></tr>
+            <tr><td>Parse Failure</td><td class="num">22</td><td class="num best">17</td></tr>
+            <tr><td>Invalid BBox</td><td class="num">29</td><td class="num best">0</td></tr>
+            <tr><td>Invalid Point</td><td class="num">1</td><td class="num best">0</td></tr>
+            <tr><td>Empty Mask</td><td class="num">0</td><td class="num">0</td></tr>
+            <tr class="group"><td colspan="3">속도 · 메모리</td></tr>
+            <tr><td>평균 추론 시간</td><td class="num best">2.764 s</td><td class="num">3.300 s</td></tr>
+            <tr><td>Baseline VRAM</td><td class="num best">16.423 GB</td><td class="num">17.320 GB</td></tr>
+            <tr><td>Peak VRAM Allocated</td><td class="num best">16.865 GB</td><td class="num">17.762 GB</td></tr>
+            <tr><td>Peak VRAM Reserved</td><td class="num best">17.506 GB</td><td class="num">18.422 GB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="two" style="margin-top:14px">
+        <div class="card">
+          <span class="verdict">채택</span>
+          <h4>bbox 1.03배 확장</h4>
+          <p>Qwen이 준 bbox를 SAM에 넘기기 전에 조금 넓혔습니다. 1.0 / 1.05 / 1.10배를 비교했더니 1.05배 근처에서 점수가 꺾여서, 범위를 좁혀 다시 재보니 1.03배가 가장 좋았습니다. 이 설정으로 첫날 0.474를 기록했습니다.</p>
+        </div>
+        <div class="card">
+          <span class="verdict">포기</span>
+          <h4>Visual CoT (Qwen 2개 연결)</h4>
+          <p>첫 번째 Qwen이 crop할 bbox와 reasoning을 만들고, 두 번째 Qwen이 원본과 crop 이미지, 앞의 reasoning을 함께 받아 최종 대상을 찾는 구조였습니다. 그런데 원래 잘 맞히던 문제까지 틀리기 시작했고, 원본 이미지를 빼거나 reasoning 전달을 생략해도 나아지지 않아 접었습니다.</p>
+        </div>
+      </div>
+
+      <h3>둘째 날: 쿼리 라우터</h3>
+      <p class="sub-lede">질문마다 필요한 추론 방식이 달라서, 먼저 질문 유형을 분류하고 유형마다 다른 추론 지시를 붙였습니다. 막대는 직전 버전을 실행했을 때 200개 질문이 각 유형으로 분류된 개수입니다.</p>
+      <div class="card" style="padding: 8px 22px">
+        <ul class="router" id="router"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== EXAMPLES ===================== -->
+  <section class="block" id="examples">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Results</span>
+        <h2>결과 예시</h2>
+        <p>최종 제출(0.513)의 마스크를 원본 위에 겹쳐 그렸습니다. 유형마다 한 장씩 골랐습니다. 질문은 원문 그대로입니다.</p>
+      </div>
+      <div class="legend-row"><span><i></i>최종 제출 마스크</span><span>이미지 오른쪽 아래 버튼으로 원본과 비교할 수 있습니다.</span></div>
+      <div class="gallery" id="gallery"></div>
+      <p class="note">예시 이미지 6장은 결과를 보여주기 위해 대회 테스트셋에서 골랐습니다. 데이터셋 전체는 주최 측 자료라 저장소에 넣지 않았습니다.</p>
+    </div>
+  </section>
+
+  <!-- ===================== FILES ===================== -->
+  <section class="block" id="files">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker">Repository</span>
+        <h2>파일</h2>
+        <p>노트북의 모델·데이터 경로는 부트캠프 서버 기준이라, 다른 환경에서 실행하려면 경로를 바꿔야 합니다.</p>
+      </div>
+      <div class="card" style="padding:0">
+        <ul class="files">
+          <li><div><div class="p">task2/ch2_team8.ipynb</div><div class="d">Task 2 최종 제출 코드 (0.513)</div></div><a class="go" data-repo-path="/blob/main/task2/ch2_team8.ipynb" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8/blob/main/task2/ch2_team8.ipynb">보기 →</a></li>
+          <li><div><div class="p">task2/real_submission8.csv</div><div class="d">최종 제출 파일 (마스크 RLE)</div></div><a class="go" data-repo-path="/blob/main/task2/real_submission8.csv" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8/blob/main/task2/real_submission8.csv">보기 →</a></li>
+          <li><div><div class="p">task2/sample_submission2.csv</div><div class="d">제출 양식 (노트북 실행에 필요)</div></div><a class="go" data-repo-path="/blob/main/task2/sample_submission2.csv" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8/blob/main/task2/sample_submission2.csv">보기 →</a></li>
+          <li><div><div class="p">task2/previous_51.0/task2_51.0.ipynb</div><div class="d">최종 확인 단계를 넣기 전 버전, 200개 실행 로그 포함 (결과 그림은 용량 때문에 제외)</div></div><a class="go" data-repo-path="/blob/main/task2/previous_51.0/task2_51.0.ipynb" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8/blob/main/task2/previous_51.0/task2_51.0.ipynb">보기 →</a></li>
+          <li><div><div class="p">task2/previous_51.0/submission_51.0.csv</div><div class="d">위 버전의 제출 파일</div></div><a class="go" data-repo-path="/blob/main/task2/previous_51.0/submission_51.0.csv" href="https://github.com/ldy1118-git/2026-dl-bootcamp-team8/blob/main/task2/previous_51.0/submission_51.0.csv">보기 →</a></li>
+          <li><div><div class="p">slides/team8_발표.pptx</div><div class="d">발표자료 (Task 1, Task 2)</div></div><a class="go" href="slides/team8_발표.pptx" download>받기 ↓</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <b>Team 8 · 토큰부족</b><br>
+    2026 AICOSS 산학협력 실습중심 딥러닝 여름부트캠프 &amp; 경진대회 (서울시립대학교)
+  </div>
+</footer>
+
+<div class="tip" id="tip" aria-hidden="true"></div>
+
+<script>
+(function () {
+  // ---------- repo links follow whoever owns the Pages site (survives a transfer) ----------
+  var repoUrl = "https://github.com/ldy1118-git/2026-dl-bootcamp-team8";
+  var host = location.hostname;
+  if (/\.github\.io$/i.test(host)) {
+    var owner = host.split(".")[0];
+    var repo = location.pathname.split("/").filter(Boolean)[0];
+    if (repo) repoUrl = "https://github.com/" + owner + "/" + repo;
+  }
+  document.querySelectorAll("[data-repo-path]").forEach(function (a) {
+    a.href = repoUrl + a.getAttribute("data-repo-path");
+  });
+
+  var tip = document.getElementById("tip");
+  function showTip(html, x, y) {
+    tip.innerHTML = html;
+    tip.classList.add("show");
+    var r = tip.getBoundingClientRect();
+    var left = Math.min(Math.max(8, x - r.width / 2), window.innerWidth - r.width - 8);
+    var top = y - r.height - 14;
+    if (top < 8) top = y + 18;
+    tip.style.left = (left + window.scrollX) + "px";
+    tip.style.top = (top + window.scrollY) + "px";
+  }
+  function hideTip() { tip.classList.remove("show"); }
+
+  // ---------- score progression ----------
+  var steps = [
+    { v: 0.4724, t: "첫 베이스라인", d: "Qwen3-VL이 bbox와 point를 주면 SAM 2.1로 분할", day: "Day 1" },
+    { v: 0.474,  t: "bbox 1.03배 확장", d: "1.0 / 1.05 / 1.10배를 비교한 뒤 1.03배로 좁혀 재측정", day: "Day 1" },
+    { v: 0.492,  t: "쿼리 라우터 + 출력 규칙 강화", d: "빈 targets 금지(비면 재시도), 묻는 대상만 표시, reasoning은 6~8단계에서 최대 4문장으로", day: "Day 2" },
+    { v: 0.505,  t: "유형 통합", d: "비슷하게 동작하던 A/B/C 유형을 하나로 묶고 D/E/F와 합쳐 4가지로 축소", day: "Day 2" },
+    { v: 0.5105, t: "요구 조건 먼저 추출", d: "질문에서 수량·구성요소·제외 조건을 먼저 뽑아 최종 targets에 반영", day: "Day 2" },
+    { v: 0.513,  t: "최종 확인 단계", d: "답하기 직전에 누락·과잉·개수 조건을 한 번 더 확인 (최종 제출)", day: "Day 2" }
+  ];
+  function fmt(v) { return v.toFixed(Math.round(v * 10000) % 10 ? 4 : 3); }
+  var list = document.getElementById("scoreList");
+  steps.forEach(function (s, i) {
+    var li = document.createElement("li");
+    li.innerHTML = '<span class="i">' + String(i + 1).padStart(2, "0") + '</span>' +
+      '<span class="v">' + fmt(s.v) + '</span>' +
+      '<span class="w"><b>' + s.t + '<span class="day">' + s.day + '</span></b><span>' + s.d + '</span></span>';
+    list.appendChild(li);
+  });
+
+  var host1 = document.getElementById("scoreChart");
+  var NS = "http://www.w3.org/2000/svg";
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  
+  function drawScore() {
+    host1.innerHTML = "";
+    var W = host1.clientWidth, H = host1.clientHeight;
+    var m = { l: 44, r: 24, t: 28, b: 30 };
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var y0 = 0.465, y1 = 0.52;
+    var X = function (i) { return m.l + (steps.length === 1 ? iw / 2 : i * iw / (steps.length - 1)); };
+    var Y = function (v) { return m.t + (1 - (v - y0) / (y1 - y0)) * ih; };
+    var svg = el("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, "aria-hidden": "true" }, host1);
+    [0.47, 0.48, 0.49, 0.50, 0.51, 0.52].forEach(function (t, k) {
+      el("line", { x1: m.l, x2: W - m.r, y1: Y(t), y2: Y(t), "class": k === 0 ? "baseline" : "gridline" }, svg);
+      var tx = el("text", { x: m.l - 8, y: Y(t) + 4, "text-anchor": "end", "class": "tick" }, svg);
+      tx.textContent = t.toFixed(2);
+    });
+    steps.forEach(function (s, i) {
+      var tx = el("text", { x: X(i), y: H - 8, "text-anchor": "middle", "class": "tick" }, svg);
+      tx.textContent = String(i + 1).padStart(2, "0");
+    });
+    var guide = el("line", { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, "class": "guide", opacity: 0 }, svg);
+    var d = steps.map(function (s, i) { return (i ? "L" : "M") + X(i) + " " + Y(s.v); }).join(" ");
+    el("path", { d: d, "class": "line" }, svg);
+    // selective direct labels: start and end only
+    var l0 = el("text", { x: X(0), y: Y(steps[0].v) - 12, "text-anchor": "start", "class": "vlabel" }, svg);
+    l0.textContent = fmt(steps[0].v);
+    var last = steps.length - 1;
+    var l1 = el("text", { x: X(last), y: Y(steps[last].v) - 12, "text-anchor": "end", "class": "vlabel" }, svg);
+    l1.textContent = fmt(steps[last].v);
+    steps.forEach(function (s, i) {
+      var g = el("g", {}, svg);
+      var hit = el("circle", { cx: X(i), cy: Y(s.v), r: 18, "class": "hit", tabindex: 0, role: "img",
+        "aria-label": (i + 1) + "단계 " + s.t + ", " + fmt(s.v) }, g);
+      el("circle", { cx: X(i), cy: Y(s.v), r: 5, "class": "dot" }, g);
+      function on() {
+        guide.setAttribute("x1", X(i)); guide.setAttribute("x2", X(i)); guide.setAttribute("opacity", 1);
+        var r = host1.getBoundingClientRect();
+        var delta = i ? '<br><span class="delta">+' + (s.v - steps[i - 1].v).toFixed(4).replace(/0+$/, "") + '</span> <span class="muted">직전 대비</span>' : "";
+        showTip('<span class="muted">' + String(i + 1).padStart(2, "0") + ' · ' + s.day + '</span><br><b>' + s.t + '</b><br>Dice <b>' + fmt(s.v) + '</b>' + delta,
+          r.left + X(i), r.top + Y(s.v));
+      }
+      function off() { guide.setAttribute("opacity", 0); hideTip(); }
+      hit.addEventListener("mouseenter", on);
+      hit.addEventListener("focus", on);
+      hit.addEventListener("mouseleave", off);
+      hit.addEventListener("blur", off);
+      hit.addEventListener("touchstart", on, { passive: true });
+    });
+  }
+  drawScore();
+  if (window.ResizeObserver) new ResizeObserver(function () { drawScore(); }).observe(host1);
+  else window.addEventListener("resize", drawScore);
+
+  // ---------- router ----------
+  var types = [
+    { k: "A", n: "직접 지칭", e: "Direct", d: "질문이 대상을 직접 말함. 추론 없이 바로 찾기", c: 33 },
+    { k: "B", n: "간접 단서", e: "Indirect", d: "은유·행동·암시로 설명. 무엇을 가리키는지 먼저 해석", c: 27 },
+    { k: "C", n: "상황·기능", e: "Function", d: "상황이나 필요를 설명. 상식으로 그 기능을 하는 물체 찾기", c: 77 },
+    { k: "D", n: "비교·순위", e: "Ranking", d: "후보를 모두 비교해 최대·최소·n번째 고르기", c: 24 },
+    { k: "E", n: "계산·논리", e: "Logical", d: "계산·날짜·퍼즐·차트 읽기 후 한 번 더 검산", c: 11 },
+    { k: "F", n: "사실 지식", e: "Factual", d: "규칙·규정 같은 사실을 먼저 떠올린 뒤 적용", c: 28 }
+  ];
+  var total = types.reduce(function (a, t) { return a + t.c; }, 0);
+  var max = 80;
+  var ul = document.getElementById("router");
+  types.forEach(function (t) {
+    var li = document.createElement("li");
+    var pct = (t.c / total * 100).toFixed(1);
+    li.innerHTML = '<span class="badge">' + t.k + '</span>' +
+      '<div><div class="name">' + t.n + '<span>' + t.e + '</span></div><div class="desc">' + t.d + '</div></div>' +
+      '<div class="bar" tabindex="0" aria-label="' + t.k + ' ' + t.n + ' ' + t.c + '개, ' + pct + '%">' +
+      '<span class="fill" style="width:calc((100% - 72px) * ' + (t.c / max) + ')"></span>' +
+      '<span class="val">' + t.c + '<small>개</small></span></div>';
+    var bar = li.querySelector(".bar");
+    function on(ev) {
+      var r = bar.querySelector(".fill").getBoundingClientRect();
+      showTip("<b>" + t.k + " · " + t.n + "</b><br>" + t.c + "개 <span class=\"muted\">· 200개 중 " + pct + "%</span>", r.right, r.top);
+    }
+    bar.addEventListener("mouseenter", on);
+    bar.addEventListener("focus", on);
+    bar.addEventListener("mouseleave", hideTip);
+    bar.addEventListener("blur", hideTip);
+    ul.appendChild(li);
+  });
+
+  // ---------- gallery ----------
+  var ex = [
+    { id: "005", k: "A", n: "직접 지칭", q: "the sign indicating a restriction against climbing", a: "대포 받침대에 붙은 <b>‘올라가지 마시오’ 표지판</b>" },
+    { id: "002", k: "B", n: "간접 단서", q: "The silent guardians that stand at the threshold, their presence alone enough to keep evil at bay.", a: "신사 입구 양옆을 지키는 <b>수호 석상 두 개</b>" },
+    { id: "114", k: "C", n: "상황·기능", q: "After cooking rice, an unexpected urgent matter comes up and you end up eating much later than usual. In this case, find the button you should press to keep the rice warm for later.", a: "밥솥의 <b>KEEP WARM(보온) 버튼</b>" },
+    { id: "165", k: "D", n: "비교·순위", q: "Among the three clocks, select and segment the one whose time-zone has the smallest absolute offset from UTC.", a: "베네치아·뉴욕·런던 중 UTC와 시차가 가장 작은 <b>런던 시계</b>" },
+    { id: "134", k: "E", n: "계산·논리", q: "With 500 yen, after purchasing the cheapest and the most expensive food items and then one more item with no change remaining, locate the price tags of all the foods being purchased.", a: "최저 70엔 + 최고 300엔 + <b>130엔 = 500엔</b>, 가격표 세 개" },
+    { id: "083", k: "F", n: "사실 지식", q: "Identify the pieces that serve the rook’s role in chess.", a: "레고 체스판 네 귀퉁이의 <b>룩(성 모양) 말 네 개</b>" }
+  ];
+  var gal = document.getElementById("gallery");
+  ex.forEach(function (e) {
+    var card = document.createElement("article");
+    card.className = "ex";
+    card.innerHTML =
+      '<div class="media">' +
+        '<img class="mask" src="assets/examples/' + e.id + '_mask.jpg" width="720" height="720" loading="lazy" alt="질문 #' + e.id + '의 최종 마스크를 겹친 이미지">' +
+        '<img class="orig" src="assets/examples/' + e.id + '_orig.jpg" width="720" height="720" loading="lazy" alt="질문 #' + e.id + '의 원본 이미지">' +
+        '<button class="toggle" type="button" aria-pressed="false">원본 보기</button>' +
+      '</div>' +
+      '<div class="body">' +
+        '<div class="type"><span class="badge">' + e.k + '</span>' + e.n + ' · #' + e.id + '</div>' +
+        '<blockquote lang="en">“' + e.q + '”</blockquote>' +
+        '<p class="ans">' + e.a + '</p>' +
+      '</div>';
+    var btn = card.querySelector(".toggle");
+    btn.addEventListener("click", function () {
+      var on = card.classList.toggle("show-orig");
+      btn.textContent = on ? "마스크 보기" : "원본 보기";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    gal.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>
